@@ -54,9 +54,9 @@ function listRawImages() {
 async function resizeTo(inputPath, outPath) {
   ensureDir(path.dirname(outPath));
   await sharp(inputPath)
-    .resize(FINAL_WIDTH, FINAL_HEIGHT, {
+        .resize(FINAL_WIDTH, FINAL_HEIGHT, {
       fit: 'cover',
-      position: 'center',
+      position: 'top',
     })
     .jpeg({ quality: 85 })
     .toFile(outPath);

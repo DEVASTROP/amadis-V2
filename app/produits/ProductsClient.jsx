@@ -129,7 +129,15 @@ export default function ProductsClient({ products }) {
                       className="relative aspect-[3/4] flex items-center justify-center"
                       style={{ backgroundColor: color }}
                     >
-                      <span className="italic text-white font-[Cormorant_Garamond] text-xl">À venir</span>
+                      {product.image_url ? (
+  <img
+    src={product.image_url}
+    alt={product.name}
+    className="absolute inset-0 w-full h-full object-cover object-top"
+  />
+) : (
+  <span className="italic text-white font-[Cormorant_Garamond] text-xl">À venir</span>
+)}
                       {/* Category badge — top-left pill */}
                       <span className="absolute top-3 left-3 bg-white/90 text-[#2C1810] text-[10px] uppercase tracking-widest px-3 py-1 font-[DM_Sans]">
                         {label}

@@ -94,11 +94,19 @@ export default function ProductModal({ product, isOpen, onClose }) {
               <div className="grid grid-cols-1 md:grid-cols-2 max-h-[85vh] overflow-y-auto">
                 {/* LEFT — image placeholder */}
                 <div
-                  className="flex items-center justify-center min-h-[280px] md:min-h-[420px]"
-                  style={{ backgroundColor: color }}
-                >
-                  <span className="italic text-white font-[Cormorant_Garamond] text-2xl">À venir</span>
-                </div>
+  className="relative flex items-center justify-center min-h-[280px] md:min-h-[420px]"
+  style={{ backgroundColor: color }}
+>
+  {product.image_url ? (
+    <img
+      src={product.image_url}
+      alt={product.name}
+      className="absolute inset-0 w-full h-full object-cover object-top"
+    />
+  ) : (
+    <span className="italic text-white font-[Cormorant_Garamond] text-2xl">À venir</span>
+  )}
+</div>
 
                 {/* RIGHT — info + form */}
                 <div className="p-8">
