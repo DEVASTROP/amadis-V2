@@ -31,3 +31,7 @@ yarn-error.log*
 
 # claude / opencode
 .opencode/
+
+error.txt
+output.txt
+/scripts/raw-products/
