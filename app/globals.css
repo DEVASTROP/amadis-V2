@@ -1,0 +1,185 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: 'Cormorant Garamond', serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+  
+  html { scroll-padding-top: 70px;
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    font-family: var(--font-body);
+    background-color: #FAF7F2;
+    color: #1A1A1A;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#2C1810] text-white px-8 py-4 text-sm uppercase tracking-widest transition-all duration-300 hover:bg-[#1a0f0a] inline-block;
+    border-radius: 0;
+  }
+  
+  .btn-outline {
+    @apply border border-[#2C1810] text-[#2C1810] px-8 py-4 text-sm uppercase tracking-widest transition-all duration-300 hover:bg-[#2C1810] hover:text-white inline-block;
+    border-radius: 0;
+  }
+  
+  .btn-whatsapp {
+    @apply bg-[#25D366] text-white px-8 py-4 text-sm uppercase tracking-widest transition-all duration-300 hover:bg-[#1da851] inline-block;
+    border-radius: 0;
+  }
+  
+  .section-label {
+    @apply text-[#D4A853] text-xs uppercase tracking-widest font-body mb-4 block;
+  }
+  
+  .section-title {
+    font-family: var(--font-display);
+    @apply text-4xl md:text-5xl text-[#1A1A1A] leading-tight;
+  }
+  
+  .gold-line {
+    @apply block w-12 h-px bg-[#D4A853] my-6;
+  }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes goldLine {
+  from { width: 0; }
+  to { width: 3rem; }
+}
+
+@layer components {
+  .animate-fadeInUp {
+    animation: fadeInUp 0.7s ease forwards;
+  }
+  .animate-fadeIn {
+    animation: fadeIn 0.5s ease forwards;
+  }
+  .animate-slideInLeft {
+    animation: slideInLeft 0.7s ease forwards;
+  }
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-400 { animation-delay: 0.4s; }
+  .delay-500 { animation-delay: 0.5s; }
+}
+
+@keyframes silkShift {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 50% 100%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 50% 0%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes silkShimmer {
+  0% { opacity: 0.3; transform: translateX(-100%) rotate(15deg); }
+  100% { opacity: 0; transform: translateX(200%) rotate(15deg); }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(120deg); }
+  66% { transform: translateY(4px) rotate(240deg); }
+}
+
+.hero-silk-bg {
+  background: linear-gradient(
+    135deg,
+    #FFFFFF 0%,
+    #FAF7F2 10%,
+    #F5EDD8 25%,
+    #EDD8A0 35%,
+    #F0E6CC 45%,
+    #FFFFFF 55%,
+    #FAF7F2 65%,
+    #D4A853 75%,
+    #EDD8A0 85%,
+    #FAF7F2 95%,
+    #FFFFFF 100%
+  );
+  background-size: 400% 400%;
+  animation: silkShift 12s ease infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-silk-bg::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 30%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: silkShimmer 6s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.hero-silk-bg::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 20%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(212, 168, 83, 0.15),
+    transparent
+  );
+  animation: silkShimmer 9s ease-in-out 3s infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sparkle-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #D4A853;
+  pointer-events: none;
+}

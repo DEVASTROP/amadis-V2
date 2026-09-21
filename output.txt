@@ -1,0 +1,28 @@
+
+> amadis@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.0
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 4.2s
+ ○ Compiling / ...
+ GET /_next/static/webpack/8a9e568d66e7219e.webpack.hot-update.json 500 in 7689ms
+ GET / 500 in 1395ms
+ GET / 500 in 40ms
+ GET / 500 in 76ms
+ GET / 500 in 54ms
+ GET /_next/static/chunks/fallback/main.js 500 in 193ms
+ GET /_next/static/chunks/fallback/webpack.js 500 in 185ms
+ GET /_next/static/chunks/fallback/react-refresh.js 500 in 183ms
+ GET /_next/static/chunks/fallback/pages/_app.js 500 in 70ms
+ GET /_next/static/chunks/fallback/pages/_error.js 500 in 63ms
+ GET / 500 in 33ms
+ ✓ Compiled /_error in 2.5s (472 modules)
+ ✓ Compiled /_not-found in 401ms (672 modules)
+ GET /_next/static/webpack/8a9e568d66e7219e.webpack.hot-update.json 404 in 693ms
+ ✓ Compiled / in 402ms (268 modules)
+ GET / 200 in 559ms
+ GET /_next/static/chunks/main-app.js?v=1783285814004 404 in 91ms
