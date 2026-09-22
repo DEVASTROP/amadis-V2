@@ -1,163 +1,546 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
+import { supabase } from '../../lib/supabase';
+import { formatPrice } from '../../lib/products';
+
+const BUCKET = 'products';
+const IMAGE_WIDTH = 800;
+const IMAGE_HEIGHT = 1067; // 3/4 portrait, same as scripts/resize-and-upload.js
+
+const CATEGORIES = [
+  { value: 'pagne-wax', label: 'Pagne wax' },
+  { value: 'tissu', label: 'Tissu' },
+  { value: 'robe', label: 'Robe' },
+];
+
+const EMPTY_FORM = {
+  name: '',
+  category: 'robe',
+  price: '',
+  description: '',
+  specs: '',
+  in_stock: true,
+  featured: false,
+};
+
+const inputClass =
+  'w-full px-3 py-2 bg-white border border-[#D4A853]/40 text-[#1A1A1A] font-[DM_Sans] focus:outline-none focus:border-[#D4A853]';
+const labelClass = 'block text-sm font-[DM_Sans] font-medium mb-2 text-[#1A1A1A]';
+const primaryButton =
+  'px-6 py-3 bg-[#2C1810] text-white font-[DM_Sans] font-medium hover:bg-[#3C2313] transition-colors disabled:opacity-50';
+const secondaryButton =
+  'px-6 py-3 border border-[#2C1810] text-[#2C1810] font-[DM_Sans] font-medium hover:bg-[#2C1810] hover:text-white transition-colors disabled:opacity-50';
+const dangerButton =
+  'px-4 py-2 border border-[#8B1A1A] text-[#8B1A1A] font-[DM_Sans] text-sm hover:bg-[#8B1A1A] hover:text-white transition-colors';
+
+// Crops the photo to 3/4 portrait, aligned to the top so heads are never cut.
+async function resizeImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = IMAGE_WIDTH;
+  canvas.height = IMAGE_HEIGHT;
+  const ctx = canvas.getContext('2d');
+  const scale = Math.max(IMAGE_WIDTH / bitmap.width, IMAGE_HEIGHT / bitmap.height);
+  const w = bitmap.width * scale;
+  const h = bitmap.height * scale;
+  ctx.drawImage(bitmap, (IMAGE_WIDTH - w) / 2, 0, w, h);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Conversion de la photo impossible.'))),
+      'image/jpeg',
+      0.85
+    );
+  });
+}
+
+function slugify(text) {
+  return (
+    text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'produit'
+  );
+}
 
 export default function AdminPage() {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    name_en: '',
-    category: '',
-    price: '',
-    description: '',
-    description_en: '',
-    specs: '',
-    image_url: '',
-    in_stock: false
-  });
-  const [loading, setLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [editingProduct, setEditingProduct] = useState(null);
+  // --- Auth ---
+  const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
 
-  // Fetch products on mount
+  // --- Products ---
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  // --- Form ---
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-    fetchProducts();
+    if (!supabase) {
+      setAuthReady(true);
+      return undefined;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      // In a real app, you would fetch from your API or database
-      // For demo purposes, we'll use mock data or leave empty
-      // This would typically be replaced with actual Supabase calls
-      setProducts([]); // Placeholder - replace with actual data fetching
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
+  const loadProducts = useCallback(async () => {
+    if (!supabase) return;
+    setLoadingProducts(true);
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      setMessage({ type: 'error', text: `Impossible de charger les produits : ${error.message}` });
+    } else {
+      setProducts(data || []);
     }
+    setLoadingProducts(false);
+  }, []);
+
+  useEffect(() => {
+    if (session) loadProducts();
+  }, [session, loadProducts]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginError('');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setLoginError('Email ou mot de passe incorrect.');
+    setLoggingIn(false);
   };
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+  const resetImage = () => {
+    setImageFile(null);
+    setImagePreview('');
   };
 
-  const handleAddProduct = () => {
-    setShowAddForm(true);
-    setFormData({
-      name: '',
-      name_en: '',
-      category: '',
-      price: '',
-      description: '',
-      description_en: '',
-      specs: '',
-      image_url: '',
-      in_stock: false
-    });
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setImageUrl('');
+    resetImage();
   };
 
-  const handleEditProduct = (product) => {
-    setShowEditForm(true);
-    setEditingProduct(product);
-    setFormData({
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setProducts([]);
+    setMessage(null);
+    closeForm();
+  };
+
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setImageUrl('');
+    resetImage();
+    setMessage(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (product) => {
+    setEditingId(product.id);
+    setForm({
       name: product.name || '',
-      name_en: product.name_en || '',
-      category: product.category || '',
-      price: product.price?.toString() || '',
+      category: product.category || 'robe',
+      price: product.price?.toString() ?? '',
       description: product.description || '',
-      description_en: product.description_en || '',
-      specs: product.specs || '',
-      image_url: product.image_url || '',
-      in_stock: product.in_stock ?? false
+      specs: Array.isArray(product.specs) ? product.specs.join('\n') : '',
+      in_stock: product.in_stock ?? true,
+      featured: product.featured ?? false,
     });
+    setImageUrl(product.image_url || '');
+    resetImage();
+    setMessage(null);
+    setFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDeleteProduct = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
-    
-    try {
-      // In a real app, you would delete from your database
-      // For demo, we'll filter it out locally
-      setProducts(prev => prev.filter(p => p.id !== id));
-      setLoading(false);
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      setLoading(false);
-    }
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    
+    setSaving(true);
+    setMessage(null);
     try {
-      // In a real app, you would save to your database
-      // For demo, we'll simulate the operation
-      
-      if (editingProduct) {
-        // Update existing product
-        const updatedProduct = {
-          ...editingProduct,
-          ...formData,
-          price: parseFloat(formData.price) || 0
-        };
-        
-        setProducts(prev => 
-          prev.map(p => p.id === editingProduct.id ? updatedProduct : p)
-        );
-      } else {
-        // Add new product
-        const newProduct = {
-          id: Date.now(), // Temporary ID - in real app use DB-generated ID
-          ...formData,
-          price: parseFloat(formData.price) || 0,
-          created_at: new Date().toISOString()
-        };
-        
-        setProducts(prev => [newProduct, ...prev]);
+      let finalImageUrl = imageUrl || null;
+
+      if (imageFile) {
+        let blob;
+        try {
+          blob = await resizeImage(imageFile);
+        } catch {
+          throw new Error('Cette photo est illisible. Utilisez une photo JPG ou PNG.');
+        }
+        const fileName = `${slugify(form.name)}-${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from(BUCKET)
+          .upload(fileName, blob, { contentType: 'image/jpeg' });
+        if (uploadError) throw new Error(`Envoi de la photo impossible : ${uploadError.message}`);
+        finalImageUrl = supabase.storage.from(BUCKET).getPublicUrl(fileName).data.publicUrl;
       }
-      
-      // Close forms and reset
-      setShowAddForm(false);
-      setShowEditForm(false);
-      setEditingProduct(null);
-      setFormData({
-        name: '',
-        name_en: '',
-        category: '',
-        price: '',
-        description: '',
-        description_en: '',
-        specs: '',
-        image_url: '',
-        in_stock: false
-      });
-    } catch (error) {
-      console.error('Error saving product:', error);
+
+      const payload = {
+        name: form.name.trim(),
+        category: form.category,
+        price: parseInt(form.price, 10) || 0,
+        description: form.description.trim() || null,
+        specs: form.specs
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean),
+        image_url: finalImageUrl,
+        in_stock: form.in_stock,
+        featured: form.featured,
+      };
+
+      const query = editingId
+        ? supabase.from('products').update(payload).eq('id', editingId)
+        : supabase.from('products').insert(payload);
+
+      const { data, error } = await query.select();
+      if (error) throw new Error(`Enregistrement impossible : ${error.message}`);
+      if (!data || data.length === 0) {
+        throw new Error('Aucune modification enregistrée. Reconnectez-vous et réessayez.');
+      }
+
+      setMessage({ type: 'success', text: editingId ? 'Produit modifié.' : 'Produit ajouté.' });
+      closeForm();
+      await loadProducts();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <>
-        <Navbar />
-        <main className="min-h-[calc(100vh-200px)]">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full border-4 border-[#D4A853]/20 border-t-[#2C1810] w-12 h-12"></div>
+  const handleDelete = async (product) => {
+    if (!window.confirm(`Supprimer « ${product.name} » ? Cette action est définitive.`)) return;
+    const { data, error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', product.id)
+      .select();
+    if (error || !data || data.length === 0) {
+      setMessage({ type: 'error', text: 'Suppression impossible. Reconnectez-vous et réessayez.' });
+      return;
+    }
+    setMessage({ type: 'success', text: 'Produit supprimé.' });
+    await loadProducts();
+  };
+
+  const categoryLabel = (value) =>
+    CATEGORIES.find((c) => c.value === value)?.label || value;
+
+  // --- Screens ---
+  let content;
+
+  if (!authReady) {
+    content = (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full border-4 border-[#D4A853]/20 border-t-[#2C1810] w-12 h-12" />
+      </div>
+    );
+  } else if (!supabase) {
+    content = (
+      <p className="text-center text-[#8B1A1A] font-[DM_Sans] py-20">
+        Supabase n’est pas configuré. Vérifiez les variables d’environnement du site.
+      </p>
+    );
+  } else if (!session) {
+    content = (
+      <div className="max-w-md mx-auto">
+        <h1 className="text-4xl font-[Cormorant_Garamond] text-center text-[#2C1810] mb-8">
+          Espace administrateur
+        </h1>
+        <form onSubmit={handleLogin} className="bg-white border border-[#D4A853]/30 p-8 space-y-5">
+          <div>
+            <label className={labelClass} htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              className={inputClass}
+            />
           </div>
-        </main>
-        <Footer />
+          <div>
+            <label className={labelClass} htmlFor="password">Mot de passe</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className={inputClass}
+            />
+          </div>
+          {loginError && <p className="text-sm text-[#8B1A1A] font-[DM_Sans]">{loginError}</p>}
+          <button type="submit" disabled={loggingIn} className={`${primaryButton} w-full`}>
+            {loggingIn ? 'Connexion…' : 'Se connecter'}
+          </button>
+        </form>
+      </div>
+    );
+  } else {
+    content = (
+      <>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-4xl font-[Cormorant_Garamond] text-[#2C1810]">Vos produits</h1>
+            <p className="mt-2 text-[#6B6B6B] font-[DM_Sans]">
+              {products.length} produit{products.length > 1 ? 's' : ''} dans la boutique
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={openAdd} className={primaryButton}>
+              Ajouter un produit
+            </button>
+            <button type="button" onClick={handleLogout} className={secondaryButton}>
+              Se déconnecter
+            </button>
+          </div>
+        </div>
+
+        {message && (
+          <div
+            role="status"
+            className={`mb-6 px-4 py-3 font-[DM_Sans] text-sm border ${
+              message.type === 'error'
+                ? 'border-[#8B1A1A] text-[#8B1A1A] bg-white'
+                : 'border-[#D4A853] text-[#2C1810] bg-white'
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
+
+        {formOpen && (
+          <form
+            onSubmit={handleSubmit}
+            className="bg-white border border-[#D4A853]/30 p-6 sm:p-8 mb-10 space-y-5"
+          >
+            <h2 className="text-2xl font-[Cormorant_Garamond] text-[#2C1810]">
+              {editingId ? 'Modifier le produit' : 'Nouveau produit'}
+            </h2>
+
+            <div>
+              <label className={labelClass} htmlFor="name">Nom du produit</label>
+              <input
+                id="name"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                required
+                className={inputClass}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className={labelClass} htmlFor="category">Catégorie</label>
+                <select
+                  id="category"
+                  name="category"
+                  value={form.category}
+                  onChange={handleChange}
+                  className={inputClass}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="price">Prix (FCFA)</label>
+                <input
+                  id="price"
+                  name="price"
+                  type="number"
+                  min="0"
+                  value={form.price}
+                  onChange={handleChange}
+                  required
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="description">Description</label>
+              <textarea
+                id="description"
+                name="description"
+                rows={3}
+                value={form.description}
+                onChange={handleChange}
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="specs">
+                Caractéristiques (une par ligne)
+              </label>
+              <textarea
+                id="specs"
+                name="specs"
+                rows={3}
+                value={form.specs}
+                onChange={handleChange}
+                placeholder={'100% coton\nTaille unique'}
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="photo">Photo</label>
+              <div className="flex items-start gap-4">
+                {(imagePreview || imageUrl) && (
+                  <img
+                    src={imagePreview || imageUrl}
+                    alt="Aperçu"
+                    className="w-24 aspect-[3/4] object-cover object-top border border-[#D4A853]/40"
+                  />
+                )}
+                <div>
+                  <input
+                    id="photo"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleFile}
+                    className="font-[DM_Sans] text-sm"
+                  />
+                  <p className="mt-2 text-xs text-[#6B6B6B] font-[DM_Sans]">
+                    La photo est recadrée automatiquement en format portrait, sans couper le haut.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 font-[DM_Sans] text-sm text-[#1A1A1A]">
+                <input
+                  type="checkbox"
+                  name="in_stock"
+                  checked={form.in_stock}
+                  onChange={handleChange}
+                  className="h-4 w-4"
+                />
+                En stock
+              </label>
+              <label className="flex items-center gap-2 font-[DM_Sans] text-sm text-[#1A1A1A]">
+                <input
+                  type="checkbox"
+                  name="featured"
+                  checked={form.featured}
+                  onChange={handleChange}
+                  className="h-4 w-4"
+                />
+                Afficher sur la page d’accueil
+              </label>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button type="submit" disabled={saving} className={primaryButton}>
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+              <button type="button" onClick={closeForm} disabled={saving} className={secondaryButton}>
+                Annuler
+              </button>
+            </div>
+          </form>
+        )}
+
+        {loadingProducts ? (
+          <p className="text-[#6B6B6B] font-[DM_Sans]">Chargement…</p>
+        ) : products.length === 0 ? (
+          <p className="text-[#6B6B6B] font-[DM_Sans] py-10">
+            Aucun produit pour l’instant. Ajoutez votre première pièce avec le bouton ci-dessus.
+          </p>
+        ) : (
+          <ul className="space-y-4">
+            {products.map((product) => (
+              <li
+                key={product.id}
+                className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white border border-[#D4A853]/30 p-4"
+              >
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  {product.image_url ? (
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="w-16 aspect-[3/4] object-cover object-top shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 aspect-[3/4] bg-[#E8E0D5] shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-[Cormorant_Garamond] text-xl text-[#1A1A1A] truncate">
+                      {product.name}
+                    </p>
+                    <p className="font-[DM_Sans] text-sm text-[#6B6B6B]">
+                      {categoryLabel(product.category)} — {formatPrice(product.price)}
+                    </p>
+                    <p className="font-[DM_Sans] text-xs text-[#6B6B6B] mt-1">
+                      {product.in_stock ? 'En stock' : 'Épuisé'}
+                      {product.featured ? ' — sur la page d’accueil' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => openEdit(product)} className={secondaryButton}>
+                    Modifier
+                  </button>
+                  <button type="button" onClick={() => handleDelete(product)} className={dangerButton}>
+                    Supprimer
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </>
     );
   }
@@ -165,404 +548,10 @@ export default function AdminPage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-[calc(100vh-200px)] pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-[Cormorant_Garamond] font-bold text-center text-[#2C1810] mb-4">
-              Administration des produits
-            </h1>
-            <p className="text-center text-[#6B6B6B] max-w-xl mx-auto">
-              Gérez votre catalogue de produits africains authentiques
-            </p>
-            <button
-              onClick={handleAddProduct}
-              className="mt-6 inline-flex items-center px-6 py-3 bg-[#2C1810] text-white font-medium rounded-lg hover:bg-[#3C2313] transition-colors"
-            >
-              Ajouter un produit
-              <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v14m7-7H7"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Add Product Form */}
-          {showAddForm && (
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-              <h2 className="text-xl font-[Cormorant_Garamond] font-bold mb-4 text-[#2C1810]">
-                Ajouter un nouveau produit
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Nom du produit</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Nom (anglais)</label>
-                    <input
-                      type="text"
-                      name="name_en"
-                      value={formData.name_en}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Catégorie</label>
-                  <select
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  >
-                    <option value="">Sélectionnez une catégorie</option>
-                    <option value="pagne-wax">Pagne Wax</option>
-                    <option value="tissu">Tissu</option>
-                    <option value="robe">Robe</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Prix (FCFA)</label>
-                    <input
-                      type="number"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      min="0"
-                      className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">En stock</label>
-                    <input
-                      type="checkbox"
-                      name="in_stock"
-                      checked={formData.in_stock}
-                      onChange={handleInputChange}
-                      className="h-4 w-4 text-[#2C1810]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Description</label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Description (anglais)</label>
-                  <textarea
-                    name="description_en"
-                    value={formData.description_en}
-                    onChange={handleInputChange}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Spécifications (séparées par des virgules)</label>
-                  <input
-                    type="text"
-                    name="specs"
-                    value={formData.specs}
-                    onChange={handleInputChange}
-                    placeholder="Ex: 100% coton, 120cm x 150cm, tissage traditionnel"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">URL de l'image</label>
-                  <input
-                    type="text"
-                    name="image_url"
-                    value={formData.image_url}
-                    onChange={handleInputChange}
-                    placeholder="URL de l'image dans Supabase Storage"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddForm(false);
-                      setFormData({
-                        name: '',
-                        name_en: '',
-                        category: '',
-                        price: '',
-                        description: '',
-                        description_en: '',
-                        specs: '',
-                        image_url: '',
-                        in_stock: false
-                      });
-                    }}
-                    className="mr-4 px-4 py-2 border border-[#D4A853]/20 rounded-lg hover:bg-[#D4A853]/10"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 bg-[#2C1810] text-white rounded-lg hover:bg-[#3C2313]"
-                    disabled={loading}
-                  >
-                    {loading ? 'Enregistrement...' : 'Enregistrer'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Edit Product Form */}
-          {showEditForm && (
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-              <h2 className="text-xl font-[Cormorant_Garamond] font-bold mb-4 text-[#2C1810]">
-                Modifier le produit
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Nom du produit</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Nom (anglais)</label>
-                    <input
-                      type="text"
-                      name="name_en"
-                      value={formData.name_en}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Catégorie</label>
-                  <select
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  >
-                    <option value="pagne-wax">Pagne Wax</option>
-                    <option value="tissu">Tissu</option>
-                    <option value="robe">Robe</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Prix (FCFA)</label>
-                    <input
-                      type="number"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      min="0"
-                      className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">En stock</label>
-                    <input
-                      type="checkbox"
-                      name="in_stock"
-                      checked={formData.in_stock}
-                      onChange={handleInputChange}
-                      className="h-4 w-4 text-[#2C1810]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Description</label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Description (anglais)</label>
-                  <textarea
-                    name="description_en"
-                    value={formData.description_en}
-                    onChange={handleInputChange}
-                    rows="3"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">Spécifications (séparées par des virgules)</label>
-                  <input
-                    type="text"
-                    name="specs"
-                    value={formData.specs}
-                    onChange={handleInputChange}
-                    placeholder="Ex: 100% coton, 120cm x 150cm, tissage traditionnel"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[#1A1A1A]">URL de l'image</label>
-                  <input
-                    type="text"
-                    name="image_url"
-                    value={formData.image_url}
-                    onChange={handleInputChange}
-                    placeholder="URL de l'image dans Supabase Storage"
-                    className="w-full px-3 py-2 border border-[#D4A853]/20 rounded-lg focus:border-[#D4A853] focus:ring-2 focus:ring-[#D4A853]/20"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditForm(false);
-                      setEditingProduct(null);
-                    }}
-                    className="mr-4 px-4 py-2 border border-[#D4A853]/20 rounded-lg hover:bg-[#D4A853]/10"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 bg-[#2C1810] text-white rounded-lg hover:bg-[#3C2313]"
-                    disabled={loading}
-                  >
-                    {loading ? 'Mise à jour...' : 'Mettre à jour'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Products List */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full border-4 border-[#D4A853]/20 border-t-[#2C1810] w-12 h-12 mx-auto"></div>
-              </div>
-            ) : (
-              <div className="px-6 py-4">
-                {products.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-[#6B6B6B]">Aucun produit trouvé. Ajoutez votre premier produit !</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b border-[#D4A853]/20">
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[#1A1A1A]">Image</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[#1A1A1A]">Nom</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[#1A1A1A]">Catégorie</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[#1A1A1A]">Prix (FCFA)</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[#1A1A1A]">Stock</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-[#1A1A1A]">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map((product) => (
-                          <tr key={product.id} className="border-t border-[#D4A853]/10 hover:bg-[#D4A853]/5">
-                            <td className="px-4 py-3">
-                              {product.image_url ? (
-                                <img 
-                                  src={product.image_url} 
-                                  alt={product.name} 
-                                  className="h-12 w-12 object-cover rounded"
-                                />
-                              ) : (
-                                <div className="h-12 w-12 bg-[#D4A853]/20 flex items-center justify-center rounded">
-                                  <span className="text-xs text-[#D4A853]">Pas d'image</span>
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">{product.name}</td>
-                            <td className="px-4 py-3">
-                              <span className="px-2 py-1 bg-[#D4A853]/20 text-[#D4A853] text-xs rounded">
-                                {product.category === 'pagne-wax' ? 'Pagne Wax' :
-                                 product.category === 'tissu' ? 'Tissu' : 'Robe'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">{parseFloat(product.price || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'XOF', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
-                            <td className="px-4 py-3">
-                              {product.in_stock ? (
-                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">En stock</span>
-                              ) : (
-                                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">En rupture</span>
-                              )}
-                            </td>
-                            <td className="text-center px-4 py-3 space-x-2">
-                              <button
-                                onClick={() => handleEditProduct(product)}
-                                className="px-3 py-1 bg-[#D4A853]/10 text-[#D4A853] rounded hover:bg-[#D4A853]/20 text-xs"
-                              >
-                                Modifier
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProduct(product.id)}
-                                className="px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 text-xs"
-                              >
-                                Supprimer
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+      <main className="min-h-screen pt-[110px] pb-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">{content}</div>
       </main>
       <Footer />
     </>
   );
-}
-
-// Helper function to format price in FCFA
-function formatPrice(price) {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'XOF',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price);
 }
