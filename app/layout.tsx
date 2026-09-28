@@ -19,6 +19,19 @@ export const metadata = {
   title: 'AMADIS — Pagnes Wax & Robes Africaines à Lomé',
   description:
     'Boutique de pagnes wax, tissus et robes africaines à Lomé, Togo. Qualité authentique, commandez via WhatsApp.',
+  openGraph: {
+    title: 'AMADIS — Pagnes Wax & Robes Africaines à Lomé',
+    description:
+      'Boutique de pagnes wax, tissus et robes africaines à Lomé, Togo. Commandez via WhatsApp.',
+    siteName: 'AMADIS',
+    locale: 'fr_FR',
+    type: 'website',
+  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({

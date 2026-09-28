@@ -64,14 +64,14 @@ export default function ProductModal({ product, isOpen, onClose }) {
             onClick={onClose}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50 }}
           />
-          <motion.div
+         <motion.div
             key="modal"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 'calc(-50% + 30px)' }}
+            animate={{ opacity: 1, y: '-50%' }}
+            exit={{ opacity: 0, y: 'calc(-50% + 30px)' }}
             transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
             onClick={(e) => e.stopPropagation()}
-            style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 51, width: '90%', maxWidth: '700px' }}
+            style={{ position: 'fixed', top: '50%', left: '50%', x: '-50%', zIndex: 51, width: '90%', maxWidth: '700px' }}
           >
             <div
               className="bg-white w-full overflow-hidden"

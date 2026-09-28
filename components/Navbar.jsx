@@ -4,14 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
-const NavLink = ({ href, children }) => {
+const NavLink = ({ href, children, light }) => {
   const [hovered, setHovered] = useState(false);
+  const baseColor = light ? '#FFFFFF' : '#3C2313';
   return (
     <Link
       href={href}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ color: hovered ? '#D4A853' : '#3C2313' }}
+      style={{ color: hovered ? '#D4A853' : baseColor }}
       className="relative text-xs uppercase tracking-widest transition-colors duration-300"
     >
       {children}
@@ -37,75 +38,53 @@ const Navbar = () => {
 
   return (
     <nav className="bg-[#FAF7F2] h-[70px] fixed top-0 left-0 right-0 z-50 border-b border-[rgba(212,168,83,0.3)]">
-      <div className="grid grid-cols-3 items-center h-full px-6">
-      {/* Left Links - Desktop Only */}
-      <div className="hidden md:flex items-center gap-8">
-        <NavLink href="/">Accueil</NavLink>
-        <NavLink href="/contact">Contactez-nous</NavLink>
-        <NavLink href="/produits?category=pagne-wax">Pagnes</NavLink>
-      </div>
+      <div className="relative flex items-center justify-between h-full px-6">
+        {/* Left Links - Desktop Only */}
+        <div className="hidden md:flex items-center gap-8 flex-1">
+          <NavLink href="/">Accueil</NavLink>
+          <NavLink href="/produits">Produits</NavLink>
+        </div>
 
-      {/* Center - Logo */}
-      <div className="flex items-center justify-center">
-        <Link href="/">
-          {/* Try multiple image extensions */}
-          <img src="/images/logo.png" alt="Amadis" onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = "/images/logo.jpg";
-          }} onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = "/images/logo.svg";
-          }} onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = "/images/logo";
-          }} style={{ height: '65px', objectFit: 'contain' }} />
-        </Link>
-      </div>
+        {/* Logo - always centered */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <Link href="/">
+            <img
+              src="/images/logo.png"
+              alt="Amadis"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/images/logo.svg';
+              }}
+              style={{ height: '65px', objectFit: 'contain' }}
+            />
+          </Link>
+        </div>
 
-      {/* Right Links - Desktop Only / Hamburger - Mobile */}
-      <div className="flex items-center justify-end gap-8">
-        <div className="hidden md:flex items-center gap-8">
-          <NavLink href="/produits?category=robe-courte">Robes Courtes</NavLink>
-          <NavLink href="/produits?category=robe-longue">Robes Longues</NavLink>
+        {/* Right Links - Desktop Only */}
+        <div className="hidden md:flex items-center justify-end gap-8 flex-1">
+          <NavLink href="/contact">Contactez-nous</NavLink>
           <NavLink href="/a-propos">À propos</NavLink>
         </div>
 
-        {/* Mobile - Hamburger Button */}
+        {/* Mobile - Hamburger Button, pinned to the right */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2 flex flex-col justify-center items-end"
+          className="md:hidden ml-auto p-2 flex flex-col justify-center items-end"
           aria-label="Menu"
         >
-          {/* Hamburger Icon */}
           <span className="block h-[2px] w-[24px] bg-[#3C2313] mb-[4px]"></span>
           <span className="block h-[2px] w-[24px] bg-[#3C2313] mb-[4px]"></span>
           <span className="block h-[2px] w-[24px] bg-[#3C2313]"></span>
         </button>
       </div>
-      </div>
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-[#3C2313] z-50 flex flex-col items-center justify-center space-y-6">
-          <NavLink href="/" style={{ color: '#fff' }}>
-            Accueil
-          </NavLink>
-          <NavLink href="/contact" style={{ color: '#fff' }}>
-            Contactez-nous
-          </NavLink>
-          <NavLink href="/produits?category=pagne-wax" style={{ color: '#fff' }}>
-            Pagnes
-          </NavLink>
-          <NavLink href="/produits?category=robe-courte" style={{ color: '#fff' }}>
-            Robes Courtes
-          </NavLink>
-          <NavLink href="/produits?category=robe-longue" style={{ color: '#fff' }}>
-            Robes Longues
-          </NavLink>
-          <NavLink href="/a-propos" style={{ color: '#fff' }}>
-            À propos
-          </NavLink>
-          {/* Close Button */}
+          <NavLink href="/" light>Accueil</NavLink>
+          <NavLink href="/produits" light>Produits</NavLink>
+          <NavLink href="/contact" light>Contactez-nous</NavLink>
+          <NavLink href="/a-propos" light>À propos</NavLink>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
             className="absolute top-4 right-4 text-white text-2xl"

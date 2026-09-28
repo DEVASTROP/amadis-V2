@@ -8,9 +8,13 @@ import PageTransition from '../../components/PageTransition';
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e) => {
+    const handleSubmit = (e) => {
     e.preventDefault();
-    // Simulate success — no real backend.
+    const name = e.target.name.value;
+    const email = e.target.email.value;
+    const message = e.target.message.value;
+    const text = `Bonjour, je m'appelle ${name} (${email}).\n\n${message}`;
+    window.open(`https://wa.me/22890126964?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     setSubmitted(true);
   };
 

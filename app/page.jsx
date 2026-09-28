@@ -277,7 +277,14 @@ const FloatingBrands = () => {
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [lastInteraction, setLastInteraction] = useState(Date.now());
+  const [isMobile, setIsMobile] = useState(false);
 
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const slideOverlayColors = [
     'rgba(245, 230, 211, 0.45)',
     'rgba(232, 213, 183, 0.45)',
@@ -296,7 +303,36 @@ export default function Home() {
     return 'next';
   };
 
-  const slideStyles = {
+    const slideStyles = isMobile ? {
+        center: {
+      left: '50%',
+      transform: 'translateX(-50%) scale(1) rotateY(0deg)',
+      opacity: 1,
+      zIndex: 20,
+      filter: 'brightness(1)',
+      cursor: 'default',
+      width: 'auto',
+      height: '96%'
+    },
+    prev: {
+      transform: 'translateX(-62%) scale(0.6) rotateY(15deg)',
+      opacity: 0.6,
+      zIndex: 10,
+      filter: 'brightness(0.8)',
+      cursor: 'pointer',
+      width: '55%',
+      height: '78%'
+    },
+    next: {
+      transform: 'translateX(62%) scale(0.6) rotateY(-15deg)',
+      opacity: 0.6,
+      zIndex: 10,
+      filter: 'brightness(0.8)',
+      cursor: 'pointer',
+      width: '55%',
+      height: '78%'
+    }
+  } : {
     center: {
       transform: 'translateX(0) scale(1.15) rotateY(0deg)',
       opacity: 1,
@@ -488,51 +524,99 @@ export default function Home() {
             </LayoutGroup>
           </div>
 
-          {/* CENTER COLUMN - 3D Carousel */}
+                              {/* CENTER COLUMN - 3D Carousel */}
           <div
-            className="relative w-full h-[60vh] md:h-full order-3 md:order-2"
-            style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              perspective: '1000px',
-              overflow: 'hidden',
-              zIndex: 5
-            }}
+            className="relative w-full order-3 md:order-2"
+            style={
+              isMobile
+                ? {
+                    position: 'relative',
+                    alignSelf: 'end',
+                    width: '100%',
+                    aspectRatio: '6 / 5',
+                    perspective: '1000px',
+                    overflow: 'hidden',
+                    zIndex: 5,
+                  }
+                : {
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    perspective: '1000px',
+                    overflow: 'hidden',
+                    zIndex: 5,
+                  }
+            }
           >
-            {[0, 1, 2].map((index) => {
-              const pos = getPosition(index);
-              const style = slideStyles[pos];
-              return (
-                <img
-                  key={index}
-                  src={images[index]}
-                  alt={`Collection ${index + 1}`}
-                  onClick={() => {
-                    if (pos !== 'center') {
-                      handleManualSlide(index);
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    objectFit: 'contain',
-                    objectPosition: 'top center',
-                    transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                    ...style
-                  }}
-                />
-              );
-            })}
-          </div>
+            {(() => {
+              const mobileSlide = {
+                center: {
+                  transform: 'translateX(-50%) scale(1) rotateY(0deg)',
+                  opacity: 1,
+                  zIndex: 20,
+                  filter: 'brightness(1)',
+                  cursor: 'default',
+                },
+                prev: {
+                  transform: 'translateX(-120%) scale(0.78) rotateY(15deg)',
+                  opacity: 0.75,
+                  zIndex: 10,
+                  filter: 'brightness(0.85)',
+                  cursor: 'pointer',
+                },
+                next: {
+                  transform: 'translateX(20%) scale(0.78) rotateY(-15deg)',
+                  opacity: 0.75,
+                  zIndex: 10,
+                  filter: 'brightness(0.85)',
+                  cursor: 'pointer',
+                },
+              };
 
+              return [0, 1, 2].map((index) => {
+                const pos = getPosition(index);
+                const style = isMobile ? mobileSlide[pos] : slideStyles[pos];
+                const layout = isMobile
+                  ? {
+                     left: '50%',
+                      top: 0,
+                      width: '62%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transformOrigin: 'center bottom',
+                    }
+                  : { objectFit: 'contain' };
+                return (
+                  <img
+                    key={index}
+                    src={images[index]}
+                    alt={`Collection ${index + 1}`}
+                    onClick={() => {
+                      if (pos !== 'center') {
+                        handleManualSlide(index);
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      objectPosition: isMobile ? 'top center' : 'center center',
+                      transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                      ...layout,
+                      ...style,
+                    }}
+                  />
+                );
+              });
+            })()}
+          </div>
+          
           {/* RIGHT COLUMN - Floating brand icons (desktop only) */}
-          <div className="hidden md:block order-3" style={{
+                    <div className="order-3" style={{
             position: 'relative',
             height: '100%',
             zIndex: 5,
-            display: 'flex',
+            display: isMobile ? 'none' : 'flex',
             alignItems: 'center',
           }}>
             <FloatingBrands />
@@ -567,12 +651,18 @@ export default function Home() {
               {/* Card 1 — PAGNES WAX */}
               <motion.div variants={fadeInUp}>
               <a
+                              
                 href="/produits?category=pagne-wax"
-                className="relative h-[320px] overflow-hidden rounded-lg block bg-[#D4A853] transition-transform duration-500 ease-out hover:scale-[1.02]"
+                className="group relative h-[320px] overflow-hidden rounded-lg block bg-[#D4A853] transition-transform duration-500 ease-out hover:scale-[1.02]"
               >
-                <div className="absolute top-4 right-4 text-[64px] text-white/20 font-[Cormorant_Garamond] font-light leading-none">
-                  01
-                </div>
+                <img
+                  src="/images/collections/pagnes-wax.jpg"
+                  alt="Pagnes wax"
+                  loading="lazy"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
 
                 <div className="absolute bottom-0 left-0 p-6">
                   <p className="text-xs uppercase tracking-widest text-white font-[DM_Sans]">
@@ -591,12 +681,18 @@ export default function Home() {
               {/* Card 2 — TISSUS */}
               <motion.div variants={fadeInUp}>
               <a
+                              
                 href="/produits?category=tissu"
-                className="relative h-[320px] overflow-hidden rounded-lg block bg-[#2C1810] transition-transform duration-500 ease-out hover:scale-[1.02]"
+                className="group relative h-[320px] overflow-hidden rounded-lg block bg-[#2C1810] transition-transform duration-500 ease-out hover:scale-[1.02]"
               >
-                <div className="absolute top-4 right-4 text-[64px] text-white/20 font-[Cormorant_Garamond] font-light leading-none">
-                  02
-                </div>
+                <img
+                  src="/images/collections/tissus.jpg"
+                  alt="Tissus africains"
+                  loading="lazy"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              
                 <div className="absolute bottom-0 left-0 p-6">
                   <p className="text-xs uppercase tracking-widest text-white font-[DM_Sans]">
                     TISSUS AFRICAINS
@@ -614,12 +710,19 @@ export default function Home() {
               {/* Card 3 — ROBES */}
               <motion.div variants={fadeInUp}>
               <a
+                              
                 href="/produits?category=robe"
-                className="relative h-[320px] overflow-hidden rounded-lg block bg-[#8B1A1A] transition-transform duration-500 ease-out hover:scale-[1.02]"
+                className="group relative h-[320px] overflow-hidden rounded-lg block bg-[#8B1A1A] transition-transform duration-500 ease-out hover:scale-[1.02]"
               >
-                <div className="absolute top-4 right-4 text-[64px] text-white/20 font-[Cormorant_Garamond] font-light leading-none">
-                  03
-                </div>
+                <img
+                  src="/images/collections/robes.jpg"
+                  alt="Robes et tenues"
+                  loading="lazy"
+                  style={{ objectPosition: 'center 25%' }}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              
                 <div className="absolute bottom-0 left-0 p-6">
                   <p className="text-xs uppercase tracking-widest text-white font-[DM_Sans]">
                     ROBES & TENUES
@@ -800,7 +903,7 @@ export default function Home() {
           </p>
 
           {/* Two centered inline buttons with gap-6 */}
-          <div className="mt-10 flex flex-col sm:flex-row justify-center gap-6">
+                    <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-6 px-6">
             <a
               href="/produits"
               className="inline-flex justify-center px-10 py-4 bg-[#2C1810] text-white text-sm uppercase tracking-widest transition-colors duration-300 hover:bg-[#1a0f0a]"
